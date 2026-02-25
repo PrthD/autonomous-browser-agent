@@ -14,6 +14,7 @@ You are tasked with creating an AI agent that fills out web forms, create a work
 that will fill out an example healthcare workflow.
 
 Here is the SOP (standard operating procedure) for the workflow:
+
 1. Navigate to https://magical-medical-form.netlify.app/
 2. Fill out the form with:
    1. First Name: John
@@ -51,17 +52,18 @@ We've provided you with a basic setup that will set you up for success. You're g
 
 - Node.js 20+
 
-
 ### Setup
 
 Clone the repository
 
 Install dependencies
+
 ```bash
 npm install
 ```
 
 Install playwright
+
 ```bash
 npx playwright install
 ```
@@ -77,5 +79,3 @@ GOOGLE_GENERATIVE_AI_API_KEY=your_google_key
 ```bash
 npm run dev
 ```
-
-

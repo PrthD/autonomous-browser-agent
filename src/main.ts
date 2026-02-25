@@ -1,16 +1,31 @@
-import { generateText } from "ai";
-import { model } from "./_internal/setup";
-import { createSession } from "./session";
+import { runAgenticWorkflow } from "./agent/loop";
+import { screenshot, waitForText } from "./agent/tools";
+import { log } from "./logger";
+import { closeSession, createSession } from "./session";
+
+const TARGET_URL = "https://magical-medical-form.netlify.app/";
 
 export async function main() {
-  // This will automatically create a chromium instance, connect, and navigate to the given url.
-  // You are given a playwright page back.
-  const page = await createSession("https://www.google.com");
+  const session = await createSession(TARGET_URL);
 
-  // We've given you an model (gemini-2.5-flash-preview-04-17), you can use the vercel AI SDK to generate text, setup tools, etc.
-  // Ensure you have set the GOOGLE_GENERATIVE_AI_API_KEY environment variable.
-  const response = await generateText({
-    model,
-    prompt: "How many r's are in strawberry?",
-  });
+  try {
+    const goal =
+      "Navigate this page and fill the form: First Name John, Last Name Doe, Date of Birth 1990-01-01, Medical ID 91927885. Then click Submit.";
+
+    await runAgenticWorkflow(session.page, goal);
+
+    // Post-condition: best-effort confirmation (page may show a success message)
+    // If it doesn't, at least capture final state for review.
+    try {
+      await waitForText(session.page, "submitted", 5000);
+      log("info", "success_toast_found");
+    } catch (err) {
+      log("warn", "success_toast_not_found", { err: String(err) });
+    }
+
+    await screenshot(session.page, "final");
+    log("info", "workflow_complete");
+  } finally {
+    await closeSession(session);
+  }
 }
