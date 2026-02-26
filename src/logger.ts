@@ -11,7 +11,6 @@ export function log(
     msg,
     ...(data ? { data } : {}),
   };
-  // JSONL so it’s easy to grep and parse
   // eslint-disable-next-line no-console
   console.log(JSON.stringify(entry));
 }

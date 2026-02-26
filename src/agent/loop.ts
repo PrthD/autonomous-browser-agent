@@ -13,7 +13,7 @@ function sleep(ms: number) {
 }
 
 type RunOptions = {
-  maxModelCalls?: number; // quota safety
+  maxModelCalls?: number;
   minDelayMs?: number; // RPM safety
 };
 
@@ -36,7 +36,7 @@ export async function runAgenticWorkflow(
     }
 
     const catalog = await buildSectionCatalog(page);
-    // console.log("PAGE CATALOG:", JSON.stringify(catalog, null, 2)); // DEBUG
+    // console.log("CATALOG", JSON.stringify(catalog, null, 2));
     const prompt = buildPrompt(goal, catalog);
 
     modelCalls += 1;

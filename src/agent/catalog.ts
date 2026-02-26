@@ -60,7 +60,7 @@ export async function buildSectionCatalog(page: Page): Promise<SectionCatalog> {
     if (!toggles[s]) throw new Error(`Missing toggle selector for: ${s}`);
   }
 
-  // Collect per-section snapshots by opening each section (accordion behavior)
+  // Collect per-section snapshots by opening each section
   const sections: SectionCatalog["sections"] = {
     "Personal Information": {
       inputs: baseSnap.inputs,
@@ -86,7 +86,7 @@ export async function buildSectionCatalog(page: Page): Promise<SectionCatalog> {
     selects: emergencySnap.selects,
   };
 
-  // return to Personal for execution start consistency
+  // return to Personal
   await clickSection(page, baseSnap, "Personal Information");
 
   return {

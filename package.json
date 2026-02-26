@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "ts-node ./src/_internal/run.ts"
+    "cli": "ts-node ./src/_internal/run.ts",
+    "api": "ts-node ./src/api/server.ts",
+    "schedule": "ts-node ./src/scheduler.ts"
   },
   "keywords": [],
   "author": "",
