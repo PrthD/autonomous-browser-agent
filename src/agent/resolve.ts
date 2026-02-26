@@ -1,7 +1,7 @@
 import { PageSnapshot } from "./snapshot";
 
 function norm(s: string) {
-  return s.toLowerCase().replace(/\s+/g, " ").trim();
+  return s.toLowerCase().replace(/[*:]+/g, "").replace(/\s+/g, " ").trim();
 }
 
 export function resolveInputSelector(
@@ -44,4 +44,32 @@ export function resolveSelectSelector(
     (s) => norm(s.label).includes(t) || t.includes(norm(s.label)),
   );
   return contains?.selectorHint ?? null;
+}
+
+export function resolveToggleSelector(
+  snapshot: PageSnapshot,
+  target: string,
+): string | null {
+  const t = norm(target);
+  const exact = snapshot.toggles.find((x) => norm(x.text) === t);
+  if (exact) return exact.selectorHint;
+
+  const contains = snapshot.toggles.find(
+    (x) => norm(x.text).includes(t) || t.includes(norm(x.text)),
+  );
+  return contains?.selectorHint ?? null;
+}
+
+export function isToggleExpanded(
+  snapshot: PageSnapshot,
+  target: string,
+): boolean | undefined {
+  const t = norm(target);
+  const exact = snapshot.toggles.find((x) => norm(x.text) === t);
+  if (exact) return exact.expanded;
+
+  const contains = snapshot.toggles.find(
+    (x) => norm(x.text).includes(t) || t.includes(norm(x.text)),
+  );
+  return contains?.expanded;
 }

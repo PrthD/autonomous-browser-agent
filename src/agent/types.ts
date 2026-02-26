@@ -2,6 +2,7 @@ export type AgentAction =
   | { type: "fill"; target: string; value: string }
   | { type: "click"; target: string }
   | { type: "select"; target: string; value: string }
+  | { type: "expand"; target: string }
   | { type: "done"; reason?: string };
 
 export type AgentPlan = {
@@ -32,6 +33,9 @@ export function assertPlan(x: any): AgentPlan {
       if (typeof a.target !== "string" || !a.target.trim())
         throw new Error("select.target invalid");
       if (typeof a.value !== "string") throw new Error("select.value invalid");
+    } else if (a.type === "expand") {
+      if (typeof a.target !== "string" || !a.target.trim())
+        throw new Error("expand.target invalid");
     } else if (a.type === "done") {
       // ok
     } else {

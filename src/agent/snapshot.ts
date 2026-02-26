@@ -11,30 +11,28 @@ export type PageSnapshot = {
   }>;
   buttons: Array<{ text: string; selectorHint: string }>;
   selects: Array<{ label: string; selectorHint: string; options: string[] }>;
+  toggles: Array<{ text: string; selectorHint: string; expanded?: boolean }>;
 };
-
-function trim(s: string, max = 80) {
-  const t = s.replace(/\s+/g, " ").trim();
-  return t.length > max ? t.slice(0, max) + "…" : t;
-}
 
 export async function snapshotPage(page: Page): Promise<PageSnapshot> {
   return await page.evaluate(() => {
+    const cleanText = (s: string) => s.replace(/\s+/g, " ").trim();
+
     const getLabelText = (el: Element): string => {
       const id = (el as HTMLElement).id;
       if (id) {
         const byFor = document.querySelector(`label[for="${CSS.escape(id)}"]`);
-        if (byFor?.textContent) return byFor.textContent;
+        if (byFor?.textContent) return cleanText(byFor.textContent);
       }
 
       const wrap = el.closest("label");
-      if (wrap?.textContent) return wrap.textContent;
+      if (wrap?.textContent) return cleanText(wrap.textContent);
 
       const aria = (el as HTMLElement).getAttribute("aria-label");
-      if (aria) return aria;
+      if (aria) return cleanText(aria);
 
       const ph = (el as HTMLInputElement).placeholder;
-      if (ph) return ph;
+      if (ph) return cleanText(ph);
 
       return "";
     };
@@ -49,11 +47,15 @@ export async function snapshotPage(page: Page): Promise<PageSnapshot> {
       const name = (el as HTMLInputElement).name;
       if (name) return `${el.tagName.toLowerCase()}[name="${name}"]`;
 
-      if (el.tagName.toLowerCase() === "button") {
-        const txt = (el as HTMLElement).textContent
-          ?.replace(/\s+/g, " ")
-          .trim();
-        if (txt) return `button:has-text("${txt.replace(/"/g, '\\"')}")`;
+      const ariaLabel = (el as HTMLElement).getAttribute("aria-label");
+      if (ariaLabel) {
+        return `${el.tagName.toLowerCase()}[aria-label="${ariaLabel.replace(/"/g, '\\"')}"]`;
+      }
+
+      const txt = cleanText((el as HTMLElement).textContent || "");
+      if (txt) {
+        const tag = el.tagName.toLowerCase();
+        return `${tag}:has-text("${txt.replace(/"/g, '\\"')}")`;
       }
 
       return el.tagName.toLowerCase();
@@ -61,13 +63,14 @@ export async function snapshotPage(page: Page): Promise<PageSnapshot> {
 
     const inputs = Array.from(document.querySelectorAll("input, textarea"))
       .filter((el) => !(el as HTMLInputElement).disabled)
-      .slice(0, 40)
+      .slice(0, 60)
       .map((el) => {
         const type = (el as HTMLInputElement).type || el.tagName.toLowerCase();
         const value =
           (el as HTMLInputElement).value ??
           (el as HTMLTextAreaElement).value ??
           undefined;
+
         return {
           label: getLabelText(el),
           selectorHint: selectorHint(el),
@@ -80,25 +83,63 @@ export async function snapshotPage(page: Page): Promise<PageSnapshot> {
       document.querySelectorAll("button, input[type='submit']"),
     )
       .filter((el) => !(el as HTMLButtonElement).disabled)
-      .slice(0, 20)
+      .slice(0, 30)
       .map((el) => ({
-        text:
+        text: cleanText(
           (el as HTMLElement).textContent ||
-          (el as HTMLInputElement).value ||
-          "",
+            (el as HTMLInputElement).value ||
+            "",
+        ),
         selectorHint: selectorHint(el),
-      }));
+      }))
+      .filter((b) => b.text);
 
     const selects = Array.from(document.querySelectorAll("select"))
       .filter((el) => !(el as HTMLSelectElement).disabled)
-      .slice(0, 20)
+      .slice(0, 30)
       .map((el) => ({
         label: getLabelText(el),
         selectorHint: selectorHint(el),
         options: Array.from((el as HTMLSelectElement).options)
-          .slice(0, 30)
-          .map((o) => o.text || o.value),
+          .slice(0, 50)
+          .map((o) => cleanText(o.text || o.value)),
       }));
+
+    const toggleCandidates = Array.from(
+      document.querySelectorAll("[aria-expanded], [role='button'], button"),
+    )
+      .filter((el) => !(el as HTMLElement).hasAttribute("disabled"))
+      .map((el) => {
+        const txt = cleanText((el as HTMLElement).textContent || "");
+        if (!txt) return null;
+
+        const ariaExpanded = (el as HTMLElement).getAttribute("aria-expanded");
+        const expanded =
+          ariaExpanded === "true"
+            ? true
+            : ariaExpanded === "false"
+              ? false
+              : undefined;
+
+        return {
+          text: txt,
+          selectorHint: selectorHint(el),
+          expanded,
+        };
+      })
+      .filter(Boolean) as Array<{
+      text: string;
+      selectorHint: string;
+      expanded?: boolean;
+    }>;
+
+    const seen = new Set<string>();
+    const toggles = toggleCandidates.filter((t) => {
+      const key = t.text.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     return {
       url: location.href,
@@ -106,6 +147,7 @@ export async function snapshotPage(page: Page): Promise<PageSnapshot> {
       inputs,
       buttons,
       selects,
+      toggles,
     };
   });
 }

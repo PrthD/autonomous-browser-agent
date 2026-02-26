@@ -2,13 +2,9 @@ import { generateText } from "ai";
 import { Page } from "playwright";
 import { model } from "../_internal/setup";
 import { log } from "../logger";
+import { buildSectionCatalog, SectionCatalog, SectionName } from "./catalog";
 import { extractFirstJsonObject } from "./json";
-import {
-  resolveButtonSelector,
-  resolveInputSelector,
-  resolveSelectSelector,
-} from "./resolve";
-import { snapshotPage } from "./snapshot";
+import { resolveInputSelector, resolveSelectSelector } from "./resolve";
 import { click, fill, screenshot, selectOption } from "./tools";
 import { AgentAction, assertPlan } from "./types";
 
@@ -39,9 +35,9 @@ export async function runAgenticWorkflow(
       throw new Error(`Exceeded MAX_MODEL_CALLS=${maxModelCalls}`);
     }
 
-    const snap = await snapshotPage(page);
-
-    const prompt = buildPrompt(goal, snap);
+    const catalog = await buildSectionCatalog(page);
+    // console.log("PAGE CATALOG:", JSON.stringify(catalog, null, 2)); // DEBUG
+    const prompt = buildPrompt(goal, catalog);
 
     modelCalls += 1;
     log("info", "llm_call", { modelCalls, maxModelCalls });
@@ -64,8 +60,18 @@ export async function runAgenticWorkflow(
       reason: plan.reason ?? null,
     });
 
+    let currentSection: SectionName = "Personal Information";
+
     for (const action of plan.actions) {
-      const didStop = await executeAction(page, snap, action);
+      const didStop = await executeAction(
+        page,
+        catalog,
+        action,
+        () => currentSection,
+        (s) => {
+          currentSection = s;
+        },
+      );
       if (didStop) return;
     }
 
@@ -76,98 +82,157 @@ export async function runAgenticWorkflow(
   }
 }
 
-function buildPrompt(goal: string, snap: any) {
-  const inputs = snap.inputs.map((i: any) => ({
-    label: i.label,
-    selectorHint: i.selectorHint,
-    type: i.type,
-    value: i.value ?? "",
-  }));
-  const buttons = snap.buttons.map((b: any) => ({
-    text: b.text,
-    selectorHint: b.selectorHint,
-  }));
-  const selects = snap.selects.map((s: any) => ({
-    label: s.label,
-    selectorHint: s.selectorHint,
-    options: s.options.slice(0, 12),
+function buildPrompt(goal: string, catalog: SectionCatalog) {
+  const sectionPayload = (name: SectionName) => ({
+    section: name,
+    inputs: catalog.sections[name].inputs.map((i) => ({
+      label: i.label,
+      selectorHint: i.selectorHint,
+      type: i.type,
+      value: i.value ?? "",
+    })),
+    selects: catalog.sections[name].selects.map((s) => ({
+      label: s.label,
+      selectorHint: s.selectorHint,
+      options: s.options,
+    })),
+  });
+
+  const sections = [
+    sectionPayload("Personal Information"),
+    sectionPayload("Medical Information"),
+    sectionPayload("Emergency Contact"),
+  ];
+
+  const toggles = Object.entries(catalog.toggles).map(([k, v]) => ({
+    text: k,
+    selectorHint: v,
   }));
 
   return [
     `You are an automation agent controlling a browser form.`,
     `Goal: ${goal}`,
     ``,
-    `Current page: ${snap.url}`,
-    `Title: ${snap.title}`,
+    `Current page: ${catalog.url}`,
+    `Title: ${catalog.title}`,
     ``,
-    `Available inputs (label -> selectorHint):`,
-    JSON.stringify(inputs, null, 0),
+    `IMPORTANT UI BEHAVIOR: This is an accordion. Only ONE section can be open at a time.`,
     ``,
-    `Available selects (label -> selectorHint + options):`,
-    JSON.stringify(selects, null, 0),
+    `Available section toggles (text -> selectorHint):`,
+    JSON.stringify(toggles, null, 0),
     ``,
-    `Available buttons (text -> selectorHint):`,
-    JSON.stringify(buttons, null, 0),
+    `Form controls by section (these are collected by opening each section):`,
+    JSON.stringify(sections, null, 0),
     ``,
     `OUTPUT FORMAT (STRICT):`,
-    `- Output ONLY JSON. No markdown. No extra text.`,
+    `- Output ONLY valid JSON. No markdown. No extra text.`,
     `- JSON schema: {"actions": AgentAction[], "done": boolean, "reason": string}`,
     `- AgentAction schema:`,
+    `  - {"type":"expand","target":"<EXACT section toggle text>"}`,
     `  - {"type":"fill","target":"<EXACT input label>","value":"..."}`,
-    `  - {"type":"click","target":"<EXACT button text>"}`,
     `  - {"type":"select","target":"<EXACT select label>","value":"<option label>"}`,
+    `  - {"type":"click","target":"Submit"}`,
     `  - {"type":"done","reason":"..."}`,
     ``,
     `HARD REQUIREMENTS:`,
-    `- Return a COMPLETE plan in ONE response.`,
-    `- If any required field is empty/incorrect, include actions to fix it.`,
-    `- Then include click Submit.`,
-    `- Then set "done": true and include a final {"type":"done"} action.`,
-    `- Target must match EXACTLY one of the provided labels/texts above.`,
-    `- Max 10 actions.`,
+    `1) Fill strictly TOP to BOTTOM in this order:`,
+    `   a) Personal Information`,
+    `   b) Medical Information`,
+    `   c) Emergency Contact`,
+    `2) Because only one section can be open, you MUST:`,
+    `   - Use {"type":"expand"} before filling/selecting fields in a different section.`,
+    `   - Do NOT expand the same section twice in a row.`,
+    `3) Use "select" ONLY for dropdown fields (they are listed under selects).`,
+    `4) Do NOT guess fields or options. Only use labels/options shown in the section catalog above.`,
+    `5) After all fields are correctly filled, click Submit.`,
+    `6) Then include a final {"type":"done"} action and set done=true.`,
+    `7) Targets MUST match EXACTLY one of the provided labels/texts above.`,
+    `8) Maximum 15 actions.`,
+    `9) Return a COMPLETE plan in ONE response. Do not rely on a second model call.`,
     ``,
     `EXAMPLE OUTPUT (shape only):`,
-    `{"actions":[{"type":"fill","target":"First Name","value":"John"},{"type":"click","target":"Submit"},{"type":"done","reason":"Submitted"}],"done":true,"reason":"Submitted"}`,
+    `{"actions":[{"type":"fill","target":"First Name","value":"John"},{"type":"expand","target":"Medical Information"},{"type":"select","target":"Gender","value":"Male"},{"type":"click","target":"Submit"},{"type":"done","reason":"Submitted"}],"done":true,"reason":"Submitted"}`,
   ].join("\n");
 }
 
 async function executeAction(
   page: Page,
-  snap: any,
+  catalog: SectionCatalog,
   action: AgentAction,
+  getSection: () => SectionName,
+  setSection: (s: SectionName) => void,
 ): Promise<boolean> {
   if (action.type === "done") {
     log("info", "done", { reason: action.reason ?? null });
     return true;
   }
 
+  if (action.type === "expand") {
+    const target = action.target as SectionName;
+    const current = getSection();
+
+    if (target === current) {
+      log("info", "expand_skip_already_current", { target });
+      return false;
+    }
+
+    const sel = catalog.toggles[target];
+    if (!sel) {
+      await screenshot(page, "fail-unresolved-expand");
+      throw new Error(`Unknown section toggle: "${action.target}"`);
+    }
+
+    await click(page, sel);
+    setSection(target);
+    log("info", "expanded", { target, selector: sel });
+    return false;
+  }
+
   if (action.type === "fill") {
-    const sel = resolveInputSelector(snap, action.target);
+    const current = getSection();
+
+    const snapLike = {
+      inputs: catalog.sections[current].inputs,
+    } as any;
+
+    const sel = resolveInputSelector(snapLike, action.target);
     if (!sel) {
       await screenshot(page, "fail-unresolved-fill");
-      throw new Error(`Could not resolve input target: "${action.target}"`);
+      throw new Error(
+        `Could not resolve input "${action.target}" in section "${current}". Likely missing expand.`,
+      );
     }
+
     await fill(page, sel, action.value);
     return false;
   }
 
-  if (action.type === "click") {
-    const sel = resolveButtonSelector(snap, action.target);
+  if (action.type === "select") {
+    const current = getSection();
+
+    const snapLike = {
+      selects: catalog.sections[current].selects,
+    } as any;
+
+    const sel = resolveSelectSelector(snapLike, action.target);
     if (!sel) {
-      await screenshot(page, "fail-unresolved-click");
-      throw new Error(`Could not resolve button target: "${action.target}"`);
+      await screenshot(page, "fail-unresolved-select");
+      throw new Error(
+        `Could not resolve select "${action.target}" in section "${current}". Likely missing expand.`,
+      );
     }
-    await click(page, sel);
+
+    await selectOption(page, sel, action.value);
     return false;
   }
 
-  if (action.type === "select") {
-    const sel = resolveSelectSelector(snap, action.target);
-    if (!sel) {
-      await screenshot(page, "fail-unresolved-select");
-      throw new Error(`Could not resolve select target: "${action.target}"`);
+  if (action.type === "click") {
+    if (action.target !== "Submit") {
+      await screenshot(page, "fail-unexpected-click");
+      throw new Error(`Only "Submit" click is supported.`);
     }
-    await selectOption(page, sel, action.value);
+
+    await click(page, catalog.submitSelector);
     return false;
   }
 

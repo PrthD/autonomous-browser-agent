@@ -10,12 +10,14 @@ export async function main() {
 
   try {
     const goal =
-      "Navigate this page and fill the form: First Name John, Last Name Doe, Date of Birth 1990-01-01, Medical ID 91927885. Then click Submit.";
+      "Navigate this page and fill the form. " +
+      "Personal Information: First Name John, Last Name Doe, Date of Birth 1990-01-01, Medical ID 91927885. " +
+      "Medical Information: Gender Male, Blood Type O+, Allergies Peanuts, Current Medications Ibuprofen. " +
+      "Emergency Contact: Emergency Contact Name Jane Doe, Emergency Contact Phone 5551234567. " +
+      "Then click Submit.";
 
     await runAgenticWorkflow(session.page, goal);
 
-    // Post-condition: best-effort confirmation (page may show a success message)
-    // If it doesn't, at least capture final state for review.
     try {
       await waitForText(session.page, "submitted", 5000);
       log("info", "success_toast_found");
