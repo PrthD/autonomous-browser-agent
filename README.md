@@ -11,10 +11,6 @@ tracking with bounded memory - Structured logging and artifact capture
 
 ---
 
-## Version
-
-**Current Version:** 1.0.0
-
 ## Runtime Requirements
 
 - **Node.js 20+** (required)
