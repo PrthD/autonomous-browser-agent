@@ -21,6 +21,7 @@ export type FormVars = {
 export type WorkflowRunOptions = {
   url?: string;
   headless?: boolean;
+  runId?: string;
 };
 
 export type WorkflowResult = {
@@ -63,24 +64,27 @@ export async function runMedicalFormWorkflow(
     process.env.TARGET_URL ??
     "https://magical-medical-form.netlify.app/";
 
+  const runId = opts.runId ?? undefined;
+
   const vars = defaultVars(varsPartial);
   const goal = buildGoal(vars);
 
   const session = await createSession(url);
 
   try {
+    log("info", "workflow_start", { runId, url });
     await runAgenticWorkflow(session.page, goal);
 
     try {
       await waitForText(session.page, "submitted", 5000);
-      log("info", "success_toast_found");
+      log("info", "success_toast_found", { runId });
     } catch (err) {
-      log("warn", "success_toast_not_found", { err: String(err) });
+      log("warn", "success_toast_not_found", { runId, err: String(err) });
     }
 
-    await screenshot(session.page, "final");
+    await screenshot(session.page, "final", runId);
 
-    log("info", "workflow_complete");
+    log("info", "workflow_complete", { runId });
     return { ok: true, reason: "Submitted" };
   } finally {
     await closeSession(session);
