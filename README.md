@@ -11,6 +11,18 @@ tracking with bounded memory - Structured logging and artifact capture
 
 ---
 
+## Version
+
+**Current Version:** 1.0.0
+
+## Runtime Requirements
+
+- **Node.js 20+** (required)
+- Playwright-compatible system dependencies
+- Gemini API key for LLM planning
+
+---
+
 ## Overview
 
 The agent automates a multi-section healthcare form located at:
