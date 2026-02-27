@@ -1,81 +1,266 @@
-# Magical LLM Challenge
+# Autonomous Browser Agent
+
+An LLM-powered autonomous browser agent that plans and executes
+structured web workflows using deterministic Playwright automation.
+
+This project demonstrates a production-style execution loop combining: -
+Structured LLM planning - Deterministic browser automation - Strict JSON
+plan validation - Single-worker queue management - HTTP API with
+synchronous wait support - Interval-based scheduling - Run lifecycle
+tracking with bounded memory - Structured logging and artifact capture
+
+---
 
 ## Overview
 
-Welcome! We're excited to see you're interested in joining our team.
+The agent automates a multi-section healthcare form located at:
 
-Today, you'll be working on a scoped down version of our autonomous automation platform.
+https://magical-medical-form.netlify.app/
 
-Below you will find all the necessary information to complete the task. If you have any questions, please reach out to your contact at Magical.
+It dynamically discovers the page structure, builds a catalog of
+available controls, generates a strictly validated JSON execution plan
+via an LLM, and executes that plan deterministically using Playwright.
 
-### Task
+The system is designed to behave predictably, avoid uncontrolled agent
+behavior, and maintain clear execution boundaries.
 
-You are tasked with creating an AI agent that fills out web forms, create a working agentic loop
-that will fill out an example healthcare workflow.
+---
 
-Here is the SOP (standard operating procedure) for the workflow:
+## System Architecture
 
-1. Navigate to https://magical-medical-form.netlify.app/
-2. Fill out the form with:
-   1. First Name: John
-   2. Last Name: Doe
-   3. Date of birth: 1990-01-01
-   4. Medical ID: 91927885
-3. Click 'Submit'
+High-level execution flow:
 
-### Bonus Points
+1.  Snapshot page and build section catalog
+2.  Generate strict JSON plan via LLM
+3.  Validate plan against schema
+4.  Execute actions deterministically
+5.  Capture artifacts and emit structured logs
+6.  Persist run state in bounded registry
+7.  Return status via API or scheduler
 
-In this challenge there are a few bonus points, that'll help supercharge the agent.
+Core design principles:
 
-1. Complete the 2nd and 3rd sections of the form. You will need to:
-   1. Fill out dropdowns
-   2. Scroll to, and open the appropriate sections
-2. Add the ability to run the workflow via an API call
-3. Add the ability to pass in variables for the prompt
-   1. Think a dynamic "First Name" and "Last Name," you can hardcode an example
-4. Make it so that this workflow can be run automatically on a schedule, every 5 minutes in this
-   case.
-5. Think of something else our agent needs and implement it!
+- Deterministic execution (no freeform browsing)
+- Label-driven element resolution
+- Strict JSON-only LLM output contract
+- Bounded model calls
+- Single browser worker to avoid race conditions
+- Memory-bounded run storage
 
-### What's provided
+---
 
-We've provided you with a basic setup that will set you up for success. You're given:
+## Features
 
-1. An initiated playwright session
-2. A model setup, with access to the Vercel AI SDK (what we use)
-   1. NOTE: You will need to provide your own Gemini API key via the `GOOGLE_GENERATIVE_AI_API_KEY` environment variable.
-   2. You can get a free API key from the [Google AI Studio](https://aistudio.google.com/apikey).
+### Agentic Planning Loop
 
-## Setup
+- Dynamically inspects the DOM
+- Catalogs:
+  - Input labels
+  - Select labels and options
+  - Section toggles
+  - Submit button
+- Prompts the LLM to return strictly formatted JSON
+- Validates plan shape before execution
+- Enforces action limits and call bounds
 
-### System Requirements
+Supported actions:
 
-- Node.js 20+
+- Expand section
+- Fill input
+- Select dropdown option
+- Click submit
+- Done
 
-### Setup
+---
 
-Clone the repository
+### Deterministic Playwright Execution
 
-Install dependencies
+All actions are executed using hardened primitives:
+
+- Scroll-into-view before interaction
+- Strict selector resolution
+- No guessing of fields or options
+- Full-page screenshot capture on key stages
+
+Artifacts are written to:
+
+```text
+artifacts/
+```
+
+---
+
+### HTTP API
+
+Start, monitor, and optionally wait for runs via API.
+
+Endpoints:
+
+```http
+GET    /api/v1/health
+POST   /api/v1/run
+GET    /api/v1/runs/:id
+```
+
+Create asynchronous run:
+
+```bash
+curl -X POST "http://localhost:3000/api/v1/run"   -H "Content-Type: application/json"   -d '{"vars":{"firstName":"John","lastName":"Doe"}}'
+```
+
+Create run and wait synchronously:
+
+```bash
+curl -X POST "http://localhost:3000/api/v1/run?wait=true&timeoutMs=60000"   -H "Content-Type: application/json"   -d '{"vars":{"firstName":"John","lastName":"Doe"}}'
+```
+
+---
+
+### Scheduler
+
+Supports interval-based execution with overlap prevention.
+
+```env
+SCHEDULE_INTERVAL_MS=300000
+SCHEDULE_RUN_ON_START=true
+```
+
+---
+
+### Run Lifecycle Management
+
+- Single-worker queue
+- In-memory run registry
+- TTL-based pruning (`RUN_TTL_MS`)
+- Max run count enforcement (`MAX_RUNS`)
+- Waiter cleanup on timeout
+
+Run states:
+
+- queued
+- running
+- succeeded
+- failed
+
+---
+
+## Environment Configuration
+
+Create a `.env` file:
+
+```env
+TARGET_URL=https://magical-medical-form.netlify.app/
+HEADLESS=true
+
+GEMINI_MODEL=gemini-2.5-flash
+GOOGLE_GENERATIVE_AI_API_KEY=your_key_here
+
+MAX_MODEL_CALLS=3
+MIN_MODEL_DELAY_MS=15000
+
+PORT=3000
+API_BASE=/api/v1
+
+SCHEDULE_INTERVAL_MS=300000
+SCHEDULE_RUN_ON_START=true
+
+MAX_RUNS=200
+RUN_TTL_MS=3600000
+```
+
+---
+
+## Installation
 
 ```bash
 npm install
-```
-
-Install playwright
-
-```bash
 npx playwright install
 ```
 
-Create a `.env` file and add your Gemini API key
+---
+
+## Running
+
+CLI:
 
 ```bash
-GOOGLE_GENERATIVE_AI_API_KEY=your_google_key
+npm run cli
 ```
 
-### Running the script
+API server:
 
 ```bash
-npm run dev
+npm run api
 ```
+
+Scheduler:
+
+```bash
+npm run schedule
+```
+
+---
+
+## Variable Injection
+
+The workflow supports runtime overrides for all form fields via API.
+
+Supported variables:
+
+- firstName
+- lastName
+- dateOfBirth
+- medicalId
+- gender
+- bloodType
+- allergies
+- currentMedications
+- emergencyContactName
+- emergencyContactPhone
+
+Example:
+
+```bash
+curl -X POST "http://localhost:3000/api/v1/run?wait=true"   -H "Content-Type: application/json"   -d '{"vars":{"firstName":"Alice","lastName":"Ng"}}'
+```
+
+---
+
+## Project Structure
+
+```text
+src/workflow.ts            # Workflow orchestration
+src/agent/loop.ts          # LLM planning loop
+src/agent/catalog.ts       # Section catalog builder
+src/agent/snapshot.ts      # DOM snapshot extraction
+src/agent/resolve.ts       # Selector resolution
+src/agent/tools.ts         # Playwright primitives
+src/api/server.ts          # API + run queue
+src/scheduler.ts           # Interval scheduler
+```
+
+---
+
+## Limitations
+
+- In-memory run storage
+- Single worker execution
+- No authentication layer
+- Not horizontally scalable
+
+---
+
+## Production Extensions
+
+- Durable job queue (Redis / BullMQ)
+- Persistent run storage
+- Browser pooling
+- Multi-tenant isolation
+- Metrics and tracing
+- Stronger submission verification
+
+---
+
+## License
+
+ISC
