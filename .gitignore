@@ -19,6 +19,9 @@ artifacts/
 playwright-report/
 test-results/
 
+# test coverage
+coverage/
+
 # OS junk
 .DS_Store
 

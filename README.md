@@ -243,9 +243,38 @@ src/agent/catalog.ts       # Section catalog builder
 src/agent/snapshot.ts      # DOM snapshot extraction
 src/agent/resolve.ts       # Selector resolution
 src/agent/tools.ts         # Playwright primitives
+src/agent/types.ts         # Plan types and validation
+src/agent/json.ts          # Strict JSON extraction
 src/api/server.ts          # API + run queue
+src/api/registry.ts        # Run registry (extracted for testability)
 src/scheduler.ts           # Interval scheduler
+src/logger.ts              # Structured logging
+
+__tests__/helpers/mocks.ts              # Shared mock factories
+__tests__/agent/json.test.ts            # JSON extraction tests
+__tests__/agent/types.test.ts           # Plan validation tests
+__tests__/agent/resolve.test.ts         # Selector resolution tests
+__tests__/agent/tools.test.ts           # Playwright primitive tests
+__tests__/agent/loop.test.ts            # LLM planning loop tests
+__tests__/api/registry.test.ts          # Registry pruning/waiter tests
+__tests__/api/server.test.ts            # API integration tests
+__tests__/scheduler/scheduler.test.ts   # Scheduler overlap tests
+__tests__/workflow/workflow.test.ts     # Workflow helper tests
 ```
+
+---
+
+## Testing
+
+116 deterministic tests across 9 files using **Vitest**. All tests are fully mocked — no network calls, no real browser launches, no LLM API calls.
+
+```bash
+npm test              # Run all tests
+npm run test:watch    # Watch mode
+npm run test:coverage # Generate coverage report
+```
+
+Coverage reports are output to `coverage/`.
 
 ---
 

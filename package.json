@@ -5,7 +5,10 @@
   "scripts": {
     "cli": "ts-node ./src/_internal/run.ts",
     "api": "ts-node ./src/api/server.ts",
-    "schedule": "ts-node ./src/scheduler.ts"
+    "schedule": "ts-node ./src/scheduler.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -13,8 +16,10 @@
   "description": "",
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.19",
