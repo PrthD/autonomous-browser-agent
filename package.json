@@ -1,5 +1,5 @@
 {
-  "name": "interview-llm",
+  "name": "autonomous-browser-agent",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {

@@ -154,27 +154,28 @@ Run states:
 
 ## Environment Configuration
 
-Create a `.env` file:
+The project uses environment variables for runtime configuration.
+
+Copy the provided example file:
+
+```bash
+cp .env.example .env
+```
+
+Then open `.env` and provide your Gemini API key:
 
 ```env
-TARGET_URL=https://magical-medical-form.netlify.app/
-HEADLESS=true
-
-GEMINI_MODEL=gemini-2.5-flash
-GOOGLE_GENERATIVE_AI_API_KEY=your_key_here
-
-MAX_MODEL_CALLS=3
-MIN_MODEL_DELAY_MS=15000
-
-PORT=3000
-API_BASE=/api/v1
-
-SCHEDULE_INTERVAL_MS=300000
-SCHEDULE_RUN_ON_START=true
-
-MAX_RUNS=200
-RUN_TTL_MS=3600000
+GOOGLE_GENERATIVE_AI_API_KEY=your_api_key_here
 ```
+
+The `.env.example` file documents all available configuration variables, including:
+
+- Target URL for the automation workflow
+- LLM model configuration
+- Model safety limits
+- API server configuration
+- Scheduler interval settings
+- Run lifecycle management limits
 
 ---
 
@@ -183,7 +184,10 @@ RUN_TTL_MS=3600000
 ```bash
 npm install
 npx playwright install
+cp .env.example .env
 ```
+
+After copying the environment file, open `.env` and add your Gemini API key.
 
 ---
 
@@ -246,7 +250,7 @@ src/agent/tools.ts         # Playwright primitives
 src/agent/types.ts         # Plan types and validation
 src/agent/json.ts          # Strict JSON extraction
 src/api/server.ts          # API + run queue
-src/api/registry.ts        # Run registry (extracted for testability)
+src/api/registry.ts        # Run registry
 src/scheduler.ts           # Interval scheduler
 src/logger.ts              # Structured logging
 
